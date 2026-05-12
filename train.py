@@ -215,7 +215,7 @@ def parse_args():
     p.add_argument("--lr", type=float, default=3e-4)
     p.add_argument("--epochs", type=int, default=3)
     p.add_argument("--warmup_steps", type=int, default=100)
-    p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--seed", type=int, default=576)
     p.add_argument("--dim", type=int, default=512)
     p.add_argument("--depth", type=int, default=6)
     p.add_argument("--heads", type=int, default=8)
