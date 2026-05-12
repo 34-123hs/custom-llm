@@ -22,7 +22,7 @@ from transformers import (
 )
 from transformers.modeling_outputs import CausalLMOutput
 import wandb
-from muon import MuonWithAuxAdam
+from muon import SingleDeviceMuonWithAuxAdam as MuonWithAuxAdam
 
 
 WORLD_RANK = int(os.environ.get("RANK", 0))
@@ -206,15 +206,16 @@ def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--project", default=None)
     p.add_argument("--run_name", default=None)
-    p.add_argument("--train_bin_path", default="/train.bin")
-    p.add_argument("--val_bin_path", default="/val.bin")
-    p.add_argument("--output_dir", default="/custom-llm-out")
+    p.add_argument("--train_bin_path", default="train.bin")
+    p.add_argument("--val_bin_path", default="val.bin")
+    p.add_argument("--output_dir", default="custom-llm-out")
     p.add_argument("--block_size", type=int, default=512)
     p.add_argument("--batch_size", type=int, default=8)
     p.add_argument("--grad_accum", type=int, default=4)
     p.add_argument("--lr", type=float, default=3e-4)
     p.add_argument("--epochs", type=int, default=3)
     p.add_argument("--warmup_steps", type=int, default=100)
+    p.add_argument("--max_size", type=int, default=5_000_000)
     p.add_argument("--seed", type=int, default=576)
     p.add_argument("--dim", type=int, default=512)
     p.add_argument("--depth", type=int, default=6)
@@ -312,6 +313,12 @@ def run_training(args):
 
     collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
 
+    tokens_per_step = args.batch_size * args.grad_accum * args.block_size * WORLD_SIZE
+    max_steps = max(1, math.ceil(args.max_size / tokens_per_step))
+    if IS_MAIN:
+        print(f"[Budget] max_size={args.max_size:,} tokens → max_steps={max_steps:,} "
+              f"(tokens/step={tokens_per_step:,})")
+
     targs = TrainingArguments(
         output_dir=args.output_dir,
         num_train_epochs=args.epochs,
@@ -334,6 +341,7 @@ def run_training(args):
         dataloader_pin_memory=True,
         seed=args.seed,
         ddp_find_unused_parameters=False,
+        max_steps=max_steps,
     )
 
     optimizer = create_muon_optimizer(model, args)

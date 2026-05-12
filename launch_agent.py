@@ -36,18 +36,25 @@ def main():
     def runner():
         wandb.init(project=project)
         config = dict(wandb.config)
+        run_id = wandb.run.id
 
         if nproc <= 1:
             cmd = [sys.executable, "train.py"]
         else:
             cmd = ["torchrun", f"--nproc_per_node={nproc}", "--standalone", "train.py"]
         cmd += ["--project", project]
-        for k, v in dict(wandb.config).items():
+        for k, v in config.items():
             cmd += [f"--{k}", str(v)]
         print(f"[agent] launch: {' '.join(cmd)}", flush=True)
 
+        # 자식 train.py가 같은 wandb run에 이어 쓰도록 부모 run을 닫고 환경 전달
+        wandb.finish()
+        env = os.environ.copy()
+        env["WANDB_RUN_ID"] = run_id
+        env["WANDB_RESUME"] = "allow"
+
         # 자식을 새 process group leader로 띄움 → 그룹째 신호 전파 가능
-        proc = subprocess.Popen(cmd, preexec_fn=os.setsid)
+        proc = subprocess.Popen(cmd, preexec_fn=os.setsid, env=env)
 
         def _forward(signum, frame):
             print(f"[agent] forward signal {signum} → pgid {proc.pid}", flush=True)
