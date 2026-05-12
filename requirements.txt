@@ -3,3 +3,4 @@ wandb
 tiktoken
 numpy
 einops
+torch

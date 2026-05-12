@@ -55,8 +55,11 @@ def main():
                 os.killpg(os.getpgid(proc.pid), signum)
             except ProcessLookupError:
                 pass
-        signal.signal(signal.SIGTERM, _forward)
-        signal.signal(signal.SIGINT, _forward)
+        try:
+            signal.signal(signal.SIGTERM, _forward)
+            signal.signal(signal.SIGINT, _forward)
+        except ValueError:
+            pass
 
         ret = proc.wait()
         print(f"[agent] child exited code={ret}", flush=True)
