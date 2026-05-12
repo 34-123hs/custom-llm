@@ -34,6 +34,9 @@ def main():
     nproc = args.nproc
 
     def runner():
+        wandb.init(project=project)
+        config = dict(wandb.config)
+
         if nproc <= 1:
             cmd = [sys.executable, "train.py"]
         else:
