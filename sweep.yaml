@@ -12,22 +12,16 @@ metric:
   name: eval/loss
   goal: minimize
 
-# wandb agent가 trial마다 이 명령을 직접 실행 — torchrun이 정상적으로 RANK/WORLD_SIZE를 세팅
-command:
-  - torchrun
-  - "--standalone"
-  - "--nproc_per_node=2"
-  - ${program}
-  - ${args}
-
 early_terminate:
   type: hyperband
   min_iter: 200
   eta: 3
 
 parameters:
-  input_text_path:
-    value: /workspace/corpus.txt
+  train_bin_path:
+    value: /workspace/train.bin
+  val_bin_path:
+    value: /workspace/val.bin
   output_dir:
     value: /workspace/outputs/sweep
   epochs:

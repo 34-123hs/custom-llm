@@ -207,7 +207,7 @@ def parse_args():
     p.add_argument("--project", default=None)
     p.add_argument("--run_name", default=None)
     p.add_argument("--train_bin_path", default="/workspace/train.bin")
-    p.add_argument("--test_bin_path", default="/workspace/test.bin")
+    p.add_argument("--val_bin_path", default="/workspace/val.bin")
     p.add_argument("--output_dir", default="/workspace/custom-llm-out")
     p.add_argument("--block_size", type=int, default=512)
     p.add_argument("--batch_size", type=int, default=8)
@@ -290,7 +290,7 @@ def run_training(args):
     np.random.seed(args.seed)
 
     assert os.path.exists(args.train_bin_path), f"파일 없음: {args.train_bin_path}"
-    assert os.path.exists(args.test_bin_path), f"파일 없음: {args.test_bin_path}"
+    assert os.path.exists(args.val_bin_path), f"파일 없음: {args.val_bin_path}"
 
     tokenizer = TiktokenHFWrapper("r50k_base")
 
@@ -307,7 +307,7 @@ def run_training(args):
         wandb.run.summary["n_params_M"] = n_params / 1e6
     
     train_ds = MemmapDataset(args.train_bin_path, args.block_size)
-    eval_ds = MemmapDataset(args.test_bin_path, args.block_size)
+    eval_ds = MemmapDataset(args.val_bin_path, args.block_size)
     
 
     collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
