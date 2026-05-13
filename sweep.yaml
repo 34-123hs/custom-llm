@@ -14,12 +14,12 @@ metric:
 
 early_terminate:
   type: hyperband
-  min_iter: 200
+  min_iter: 5
   eta: 3
 
 parameters:
   max_size:
-    value: 5000000
+    value: 50000000
   max_val_size:
     value: 1000000
   train_bin_path:
@@ -30,6 +30,8 @@ parameters:
     value: sweep_outputs
   epochs:
     value: 1
+  eval_interval:
+    value: 200
 
   lr:
     distribution: log_uniform_values

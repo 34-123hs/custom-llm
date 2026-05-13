@@ -220,6 +220,7 @@ def parse_args():
     p.add_argument("--lr", type=float, default=3e-4)
     p.add_argument("--epochs", type=int, default=3)
     p.add_argument("--warmup_steps", type=int, default=100)
+    p.add_argument("--eval_interval", type=int, default=50)
     p.add_argument("--max_size", type=int, default=50_000_000)
     p.add_argument("--max_val_size", type=int, default=500_000)
     p.add_argument("--seed", type=int, default=576)
@@ -334,7 +335,7 @@ def run_training(args):
         warmup_steps=args.warmup_steps,
         weight_decay=args.weight_decay,
         lr_scheduler_type="cosine",
-        logging_steps=20,
+        logging_steps=args.eval_interval,
         eval_strategy="steps",
         eval_steps=1000,
         save_total_limit=2,
