@@ -20,6 +20,8 @@ early_terminate:
 parameters:
   max_size:
     value: 5000000
+  max_val_size:
+    value: 1000000
   train_bin_path:
     value: train.bin
   val_bin_path:

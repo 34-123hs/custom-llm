@@ -177,10 +177,15 @@ class TiktokenHFWrapper(PreTrainedTokenizer):
         return ()
 
 class MemmapDataset(Dataset):
-    def __init__(self, path, block_size, dtype=np.uint16):
+    def __init__(self, path, block_size, dtype=np.uint16, max_tokens=None):
         self.data = np.memmap(path, dtype=dtype, mode="r")
         self.block_size = block_size
-        self.n_blocks = len(self.data) // block_size
+
+        n_tokens = len(self.data)
+        if max_tokens is not None:
+            n_tokens = min(n_tokens, max_tokens)
+
+        self.n_blocks = n_tokens // block_size
 
     def __len__(self):
         return self.n_blocks
@@ -215,7 +220,8 @@ def parse_args():
     p.add_argument("--lr", type=float, default=3e-4)
     p.add_argument("--epochs", type=int, default=3)
     p.add_argument("--warmup_steps", type=int, default=100)
-    p.add_argument("--max_size", type=int, default=5_000_000)
+    p.add_argument("--max_size", type=int, default=50_000_000)
+    p.add_argument("--max_val_size", type=int, default=500_000)
     p.add_argument("--seed", type=int, default=576)
     p.add_argument("--dim", type=int, default=512)
     p.add_argument("--depth", type=int, default=6)
@@ -308,8 +314,7 @@ def run_training(args):
         wandb.run.summary["n_params_M"] = n_params / 1e6
     
     train_ds = MemmapDataset(args.train_bin_path, args.block_size)
-    eval_ds = MemmapDataset(args.val_bin_path, args.block_size)
-    
+    eval_ds = MemmapDataset(args.val_bin_path, args.block_size, max_tokens=args.max_val_size)
 
     collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
 
@@ -331,9 +336,7 @@ def run_training(args):
         lr_scheduler_type="cosine",
         logging_steps=20,
         eval_strategy="steps",
-        eval_steps=200,
-        save_strategy="steps",
-        save_steps=200,
+        eval_steps=1000,
         save_total_limit=2,
         fp16=torch.cuda.is_available(),
         report_to="wandb",
