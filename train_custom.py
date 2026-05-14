@@ -1,6 +1,5 @@
 """
-train.py — Custom LLM (RoPE + RMSNorm + SDPA) 학습 본체
-train.bin, eval.bin 필요
+train_custom.py
 """
 
 import os
@@ -140,6 +139,10 @@ class LLM(nn.Module):
         return CausalLMOutput(loss=loss, logits=logits)
 
 
+
+
+
+
 class TiktokenHFWrapper(PreTrainedTokenizer):
     vocab_files_names = {}
     model_input_names = ["input_ids", "attention_mask"]
@@ -209,26 +212,28 @@ def install_signal_handlers():
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--project", default=None)#
-    p.add_argument("--run_name", default=None)#
-    p.add_argument("--train_bin_path", default="train.bin")#
-    p.add_argument("--val_bin_path", default="val.bin")#
-    p.add_argument("--output_dir", default="custom-llm-out")#
-    p.add_argument("--block_size", type=int, default=512)#
-    p.add_argument("--batch_size", type=int, default=8)#
-    p.add_argument("--grad_accum", type=int, default=4)#
-    p.add_argument("--lr", type=float, default=3e-4)#
+    p.add_argument("--project", default=None)
+    p.add_argument("--run_name", default=None)
+    p.add_argument("--train_bin_path", default="train.bin")
+    p.add_argument("--val_bin_path", default="val.bin")
+    p.add_argument("--output_dir", default="custom-llm-out")
+    p.add_argument("--block_size", type=int, default=512)
+    p.add_argument("--batch_size", type=int, default=8)
+    p.add_argument("--grad_accum", type=int, default=4)
+    p.add_argument("--lr", type=float, default=3e-4)
     p.add_argument("--epochs", type=int, default=3)
-    p.add_argument("--warmup_steps", type=int, default=100)#
-    p.add_argument("--eval_interval", type=int, default=50)#
-    p.add_argument("--max_size", type=int, default=50_000_000)#
-    p.add_argument("--max_val_size", type=int, default=500_000)#
-    p.add_argument("--seed", type=int, default=576)#
-    p.add_argument("--dim", type=int, default=512)#
-    p.add_argument("--depth", type=int, default=6)#
-    p.add_argument("--heads", type=int, default=8)#
-    p.add_argument("--rope_base", type=int, default=10000)#
-    p.add_argument("--dropout", type=float, default=0.0)#
+    p.add_argument("--warmup_steps", type=int, default=100)
+    p.add_argument("--eval_interval", type=int, default=50)
+    p.add_argument("--max_size", type=int, default=50_000_000)
+    p.add_argument("--max_val_size", type=int, default=500_000)
+    p.add_argument("--seed", type=int, default=576)
+    p.add_argument("--dim", type=int, default=512)
+    p.add_argument("--depth", type=int, default=6)
+    p.add_argument("--heads", type=int, default=8)
+    p.add_argument("--dim_head", type=int, default=64)
+    p.add_argument("--mlp_dim", type=int, default=2048)
+    p.add_argument("--rope_base", type=int, default=10000)
+    p.add_argument("--dropout", type=float, default=0.0)
 
     # Muon
     p.add_argument("--muon_lr", type=float, default=0.02)
@@ -302,7 +307,7 @@ def run_training(args):
 
     model = LLM(
         dim=args.dim, depth=args.depth, max_len=args.block_size,
-        mlp_dim=args.dim*4, heads=args.heads, dim_head=args.dim//args.heads,
+        mlp_dim=args.mlp_dim, heads=args.heads, dim_head=args.dim_head,
         vocab_size=tokenizer.vocab_size, padding_idx=tokenizer.pad_token_id,
         base=args.rope_base, dropout=args.dropout,
     )
