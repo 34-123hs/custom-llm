@@ -15,15 +15,12 @@ import numpy as np
 from einops import rearrange
 from torch.utils.data import Dataset
 from transformers import (
-    PreTrainedTokenizer,
     Trainer,
     TrainingArguments,
-    DataCollatorForLanguageModeling,
 )
 from transformers.modeling_outputs import CausalLMOutput
 import wandb
 from muon import SingleDeviceMuonWithAuxAdam as MuonWithAuxAdam
-
 
 WORLD_RANK = int(os.environ.get("RANK", 0))
 WORLD_SIZE = int(os.environ.get("WORLD_SIZE", 1))
@@ -113,10 +110,9 @@ class Transformer(nn.Module):
 
 class LLM(nn.Module):
     def __init__(self, dim, depth, max_len, mlp_dim, heads, dim_head,
-                 vocab_size, padding_idx, base=10000, dropout=0.):
+                 vocab_size, base=10000, dropout=0.):
         super().__init__()
-        self.padding_idx = padding_idx
-        self.embedding = nn.Embedding(vocab_size, dim, padding_idx=padding_idx)
+        self.embedding = nn.Embedding(vocab_size, dim)
         self.transformer = Transformer(dim, depth, max_len, mlp_dim, heads,
                                        dim_head, base, dropout=dropout)
         self.dropout = nn.Dropout(p=dropout)
@@ -138,43 +134,6 @@ class LLM(nn.Module):
                 ignore_index=-100,
             )
         return CausalLMOutput(loss=loss, logits=logits)
-
-
-class TiktokenHFWrapper(PreTrainedTokenizer):
-    vocab_files_names = {}
-    model_input_names = ["input_ids", "attention_mask"]
-
-    def __init__(self, encoding_name="r50k_base", **kwargs):
-        self._enc = tiktoken.get_encoding(encoding_name)
-        self._eot = self._enc.eot_token
-        eot_str = "<|endoftext|>"
-        kwargs.setdefault("eos_token", eot_str)
-        kwargs.setdefault("bos_token", eot_str)
-        kwargs.setdefault("unk_token", eot_str)
-        kwargs.setdefault("pad_token", eot_str)
-        super().__init__(**kwargs)
-
-    @property
-    def vocab_size(self):
-        return self._enc.n_vocab
-
-    def get_vocab(self):
-        return {self._enc.decode([i]): i for i in range(self.vocab_size)}
-
-    def _tokenize(self, text):
-        return [str(i) for i in self._enc.encode(text, allowed_special={"<|endoftext|>"})]
-
-    def _convert_token_to_id(self, token):
-        return int(token)
-
-    def _convert_id_to_token(self, index):
-        return str(index)
-
-    def convert_tokens_to_string(self, tokens):
-        return self._enc.decode([int(t) for t in tokens])
-
-    def save_vocabulary(self, save_directory, filename_prefix=None):
-        return ()
 
 class MemmapDataset(Dataset):
     def __init__(self, path, block_size, dtype=np.uint16, max_tokens=None):
@@ -236,7 +195,6 @@ def parse_args():
     p.add_argument("--weight_decay", type=float, default=0.1)
     return p.parse_args()
 
-
 def init_wandb(args):
     if not IS_MAIN:
         return args
@@ -247,7 +205,6 @@ def init_wandb(args):
             setattr(args, k, v)
     print(f"[rank 0] args={vars(args)}")
     return args
-
 
 def create_muon_optimizer(model, args):
     hidden_matrix_params = []
@@ -290,7 +247,6 @@ def create_muon_optimizer(model, args):
     ]
     return MuonWithAuxAdam(param_groups)
 
-
 def run_training(args):
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -298,13 +254,14 @@ def run_training(args):
     assert os.path.exists(args.train_bin_path), f"파일 없음: {args.train_bin_path}"
     assert os.path.exists(args.val_bin_path), f"파일 없음: {args.val_bin_path}"
 
-    tokenizer = TiktokenHFWrapper("r50k_base")
+    enc = tiktoken.get_encoding("r50k_base")
+    vocab_size = enc.n_vocab  # 50257
 
     model = LLM(
         dim=args.dim, depth=args.depth, max_len=args.block_size,
         mlp_dim=args.dim*4, heads=args.heads, dim_head=args.dim//args.heads,
-        vocab_size=tokenizer.vocab_size, padding_idx=tokenizer.pad_token_id,
-        base=args.rope_base, dropout=args.dropout,
+        vocab_size=vocab_size, base=args.rope_base,
+        dropout=args.dropout,
     )
 
     if IS_MAIN:
@@ -315,7 +272,9 @@ def run_training(args):
     train_ds = MemmapDataset(args.train_bin_path, args.block_size)
     eval_ds = MemmapDataset(args.val_bin_path, args.block_size, max_tokens=args.max_val_size)
 
-    collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+    def collate_fn(examples):
+        input_ids = torch.stack([e["input_ids"] for e in examples])
+        return {"input_ids": input_ids, "labels": input_ids.clone()}
 
     tokens_per_step = args.batch_size * args.grad_accum * args.block_size * WORLD_SIZE
     max_steps = max(1, math.ceil(args.max_size / tokens_per_step))
@@ -337,7 +296,7 @@ def run_training(args):
         eval_strategy="steps",
         eval_steps=args.eval_interval,
         save_total_limit=2,
-        fp16=torch.cuda.is_available(),
+        bf16=torch.cuda.is_bf16_supported(),
         report_to="wandb",
         run_name=args.run_name,
         dataloader_pin_memory=True,
@@ -353,7 +312,7 @@ def run_training(args):
         args=targs,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
-        data_collator=collator,
+        data_collator=collate_fn,
         optimizers=(optimizer, None),
     )
     trainer.train()
