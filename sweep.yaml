@@ -14,7 +14,7 @@ metric:
 
 early_terminate:
   type: hyperband
-  min_iter: 20
+  min_iter: 10
   eta: 3
 
 parameters:
@@ -31,7 +31,7 @@ parameters:
   epochs:
     value: 1
   eval_interval:
-    value: 200
+    value: 50
   block_size:
     value: 768
 
