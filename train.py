@@ -4,6 +4,7 @@ train.bin, eval.bin 필요
 """
 
 import os
+import json
 import math
 import signal
 import argparse
@@ -325,6 +326,8 @@ def run_training(args):
         print(f"[Eval] loss={metrics['eval_loss']:.4f}  ppl={ppl:.2f}")
         wandb.log({"final/eval_loss": metrics["eval_loss"], "final/perplexity": ppl})
         trainer.save_model(args.output_dir)
+        with open(os.path.join(args.output_dir, "config.json"), "w") as f:
+            json.dump(vars(args), f, indent=2)
         wandb.finish()
 
 
