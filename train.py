@@ -109,6 +109,8 @@ class Transformer(nn.Module):
 
 
 class LLM(nn.Module):
+    accepts_loss_kwargs = False
+
     def __init__(self, dim, depth, max_len, mlp_dim, heads, dim_head,
                  vocab_size, base=10000, dropout=0.):
         super().__init__()
