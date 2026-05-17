@@ -38,7 +38,7 @@ parameters:
   lr:
     distribution: log_uniform_values
     min: 1.0e-5
-    max: 1.0e-3
+    max: 5.0e-3
   dropout:
     values: [0.0, 0.025, 0.05]
   batch_size:
@@ -46,8 +46,8 @@ parameters:
   grad_accum:
     values: [2, 4, 6, 8]
   depth:
-    values: [12, 16, 20]
+    values: [12]
   dim:
-    values: [384, 512, 768]
+    values: [768]
   warmup_steps:
     values: [100, 150, 200]
